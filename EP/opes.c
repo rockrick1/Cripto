@@ -41,10 +41,9 @@ uint64_t rotate_bit(uint64_t a, uint64_t d) {
 
 // Terceira operação básica
 uint64_t bolinha(uint64_t B, uint64_t C) {
-    extern uint8_t *EXP, *LOG;
+    extern uint8_t *EXP;
     uint8_t b[8], c[8];
-    printBits(sizeof(B), &B);
-    printf("\n");
+    // printBits(sizeof(B), &B);
 
     for (int i = 7; i >= 0; i--) {
         b[i] = B%256;
@@ -62,8 +61,38 @@ uint64_t bolinha(uint64_t B, uint64_t C) {
         // printf("c\n");
 
         A |= EXP[b[i]] ^ EXP[c[i]];
-        printBits(sizeof(A), &A);
-        printf("a\n");
+        // printBits(sizeof(A), &A);
     }
     return A;
+}
+
+// Reversa da ultima operação
+// Quero B, tendo A e C
+uint64_t bolinha_inverse(uint64_t A, uint64_t C) {
+    extern uint8_t *LOG, *EXP;
+    uint8_t a[8], c[8];
+    // printBits(sizeof(B), &B);
+
+    for (int i = 7; i >= 0; i--) {
+        a[i] = A%256;
+        c[i] = C%256;
+        A >>= 8;
+        C >>= 8;
+    }
+
+    uint64_t B = 0;
+    uint8_t fBj = 0; // temporarios, para aplicar f reversa
+    for (int j = 0; j < 8; j++) {
+        B <<= 8;
+        // printBits(sizeof(EXP[b[i]]), &EXP[b[i]]);
+        // printf("b\n");
+        // printBits(sizeof(EXP[c[i]]), &EXP[c[i]]);
+        // printf("c\n");
+        fBj = a[j] ^ EXP[c[j]];
+        B |= LOG[fBj]; // reversa de f
+
+        // A |= EXP[b[i]] ^ EXP[c[i]];
+        // printBits(sizeof(A), &A);
+    }
+    return B;
 }

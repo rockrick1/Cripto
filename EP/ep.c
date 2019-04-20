@@ -3,6 +3,7 @@
 
 const unsigned A_SIZE = 128;
 const unsigned K_SIZE = 16;
+const unsigned R = 12;
 
 uint8_t *EXP;
 uint8_t *LOG;
@@ -35,8 +36,8 @@ char *gen_K(char *A) {
 
 
 
-void K128(uint64_t *subkeys, uint64_t Xa, uint64_t Xb) {
-    int R = 12;
+uint64_t *K128_encript(uint64_t *subkeys, uint64_t Xa, uint64_t Xb) {
+    uint64_t *ret = malloc(2*sizeof(uint64_t));
 
     uint64_t ka, kb, ke, kf;
     uint64_t Xla = Xa, Xlb = Xb;
@@ -75,7 +76,54 @@ void K128(uint64_t *subkeys, uint64_t Xa, uint64_t Xb) {
     uint64_t XeFinal, XfFinal;
     XeFinal = bolinha(Xlf, subkeys[4*R + 1]);
     XfFinal = Xle + subkeys[4*R + 2];
+    ret[0] = XeFinal;
+    ret[1] = XfFinal;
+    return ret;
 }
+
+
+uint64_t *K128_decript(uint64_t *subkeys, uint64_t XeFinal, uint64_t XfFinal) {
+    uint64_t *ret = malloc(2*sizeof(uint64_t));
+
+    uint64_t ka, kb, ke, kf;
+    uint64_t Xlf, Xle, Xe, Xf;
+    uint64_t Xa, Xb;
+    // primeiro, revertemos a tranformação T
+    Xlf = bolinha_inverse(XeFinal, subkeys[4*R + 1]); // inversa de bolinha
+    Xle = XfFinal - subkeys[4*R + 2]; // inversa da soma
+
+    // Agora temos os valores resultantes da ultima iteração
+    // Temos que refazer as iterações, mas com as operações reversas
+
+    for (int i = 0, j = 4*R; i < R; i++, j -= 4) {
+        // reversa da segunda parte
+        ke = subkeys[j-1];
+        kf = subkeys[j];
+
+        uint64_t Y1, Y2, Z;
+        // Y1 = Xle xor Z xor Xlf xor Z = Xle xor Xlf
+        Y1 = Xle ^ Xlf;
+        Y2 = bolinha(((bolinha(ke, Y1)) + Y1), kf);
+        Z = (bolinha(ke, Y1)) + Y2;
+        Xe = Xle ^ Z;
+        Xf = Xlf ^ Z;
+
+        // reversa da primeira parte
+        ka = subkeys[j-3];
+        kb = subkeys[j-2];
+
+        Xa = bolinha_inverse(Xe, ka);
+        Xb = Xf - kb;
+
+        // prepara o proximo round
+        Xle = Xa;
+        Xlf = Xb;
+    }
+    ret[0] = Xa;
+    ret[1] = Xb;
+    return ret;
+}
+
 
 uint64_t *gen_subkeys(int R, char *K) {
     uint64_t *L = malloc((4*R + 3)*sizeof(uint64_t));
@@ -168,8 +216,9 @@ int main(int argc, char **argv) {
     uint64_t *subkeys;
 
     gen_exp_log();
-    uint64_t ble = bolinha(0x9e3779b97f4a7151, 0x1324819741ff2312);
-    // return 0;
+    // printf("bolinha\n");
+    // uint64_t ble = bolinha(0x9e3779b97f4a7151, 0x1324819741ff2312);
+    // printf("fim do bolinha\n");
 
     A = malloc(A_SIZE*sizeof(char));
 
@@ -180,18 +229,24 @@ int main(int argc, char **argv) {
     strcpy(A, "00000000000000aa");
     if (!validade_entry(A)) {
         printf("Invalid entry!\n");
+        free(A);
         return 0;
     }
     K = gen_K(A);
 
     printf("%d\n", validade_entry(A));
 
-    subkeys = gen_subkeys(10, K);
-    printf("%lu\n", subkeys[3]);
+    subkeys = gen_subkeys(R, K);
+    uint64_t *cript = K128_encript(subkeys, 0x9e3779b97f4a7151, 0x1324819741ff2312);
+    printf("\n\n%lx\n%lx\n\n", cript[0], cript[1]);
+    uint64_t *decript = K128_decript(subkeys, cript[0], cript[1]);
+    printf("\n\n%lx\n%lx\n\n", decript[0], decript[1]);
 
     free(subkeys);
     free(EXP);
     free(LOG);
+    free(cript);
+    free(decript);
     free(A);
     free(K);
 
