@@ -96,3 +96,19 @@ uint64_t bolinha_inverse(uint64_t A, uint64_t C) {
     }
     return B;
 }
+
+// gera os vetores de exp e log globais
+void gen_exp_log() {
+    // exp[x] = y e log[y] = x
+    // y = f(x) = 45^x mod 257 (y = 0 se x = 128)
+    extern uint8_t *EXP;
+    extern uint8_t *LOG;
+
+    for (int i = 0; i <= 256; i++) {
+        long long unsigned tmp = 1;
+        for (int j = 0; j < i; j++)
+            tmp = (tmp*45)%257;
+        EXP[i] = (uint8_t) tmp;
+        LOG[EXP[i]] = i;
+    }
+}
