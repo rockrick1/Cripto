@@ -13,6 +13,7 @@ void printBits(size_t const size, void const * const ptr) {
             byte = (b[i] >> j) & 1;
             printf("%u", byte);
         }
+        printf(".");
     }
     puts("");
 }
