@@ -193,14 +193,14 @@ uint64_t *K128_decript(uint64_t *subkeys, uint64_t XeFinal, uint64_t XfFinal) {
 }
 
 
-void encrypt_file(char *filename, uint64_t *subkeys) {
+void encrypt_file(char *file_in_name, char *file_out_name, uint64_t *subkeys) {
     FILE *file;
     uint8_t *buffer;
     uint64_t *filebits;
     long filelen;
     int i, f;
 
-    file = fopen(filename, "rb");
+    file = fopen(file_in_name, "rb");
     fseek(file, 0, SEEK_END);
     filelen = ftell(file);
     rewind(file);
@@ -274,17 +274,17 @@ void encrypt_file(char *filename, uint64_t *subkeys) {
 
     // criptografa e escreve no arquivo de saída
     FILE *write;
-    write = fopen("out.bin","wb");
+    write = fopen(file_out_name,"wb");
     uint64_t Xa, Xb;
     uint64_t *cript = NULL;
-    printf("antes de criptografar\n");
+    printf("\nantes de criptografar\n");
     for (i = 0; i < f; i += 2) {
         Xa = filebits[i];
         Xb = filebits[i+1];
-        printf("%lx \t%lx\n", Xa, Xb);
+        printf("i: %d - %lx \t%lx\n",i, Xa, Xb);
     }
 
-    printf("criptografado\n");
+    printf("\ncriptografado\n");
     for (i = 0; i < f; i += 2) {
         Xa = filebits[i];
         Xb = filebits[i+1];
@@ -293,7 +293,7 @@ void encrypt_file(char *filename, uint64_t *subkeys) {
         Xa = cript[0];
         Xb = cript[1];
 
-        printf("%lx \t%lx\n", Xa, Xb);
+        printf("i: %d - %lx \t%lx\n",i, Xa, Xb);
 
         fwrite(&Xa,sizeof(Xa), 1, write);
         fwrite(&Xb,sizeof(Xb), 1, write);
@@ -308,72 +308,72 @@ void encrypt_file(char *filename, uint64_t *subkeys) {
 }
 
 
-void decrypt_file(char *filename, uint64_t *subkeys) {
+void decrypt_file(char *file_in_name, char *file_out_name, uint64_t *subkeys) {
     FILE *file;
-    uint8_t *buffer;
+    uint64_t *buffer;
     uint64_t *filebits;
     long filelen;
-    int i, f;
+    int i;
 
-    file = fopen(filename, "rb");
+    file = fopen(file_in_name, "rb");
     fseek(file, 0, SEEK_END);
     filelen = ftell(file);
     rewind(file);
-    buffer = malloc((filelen+1)*sizeof(uint8_t));
-    filebits = malloc((filelen+1)*sizeof(uint64_t));
+    buffer = malloc(((filelen/8)+1)*sizeof(uint64_t));
+    filebits = malloc(((filelen/8)+1)*sizeof(uint64_t));
 
 
-    for(i = 0; i < filelen; i++) {
-        if (fread(buffer + i, 1, 1, file));
+    for(i = 0; i < filelen/8; i++) {
+        if (fread(buffer + i, sizeof(uint64_t), 1, file));
     }
 
     // monta o vetor de bits do arquivo filebits
-    uint64_t X = 0;
-    for(i = 0, f = 0; i < filelen; i++) {
-        // monta X
-        // printf("antes do shift %lx\n", X);
-        X <<= 8;
-        // printf("depois do shift %lx\n", X);
-        X |= buffer[i];
-        if (i < 200) {
-            // printf("i = %d - %lx - %x\n", i,X, buffer[i]);
-            // printBits(sizeof(buffer[i]), &buffer[i]);
-            // printBits(sizeof(X), &X);
-            // printf("\n");
-
-        }
-        // printBits(sizeof(buffer[i]), &buffer[i]);
-
-        // terminou um X, adiciona no vetor
-        if (!((i+1)%8) && i != 0) {
-            // printf("passei %lx\n", X);
-            filebits[f] = X;
-            // printf("i: %d\n", i);
-            // printBits(sizeof(X), &X);
-            f++;
-            X = 0;
-        }
-    }
+    // uint64_t X = 0;
+    // for(i = 0, f = 0; i < filelen; i++) {
+    //     // monta X
+    //     // printf("antes do shift %lx\n", X);
+    //     X <<= 8;
+    //     // printf("depois do shift %lx\n", X);
+    //     X |= buffer[i];
+    //     if (i < 200) {
+    //         // printf("i = %d - %lx - %x\n", i,X, buffer[i]);
+    //         // printBits(sizeof(buffer[i]), &buffer[i]);
+    //         // printBits(sizeof(X), &X);
+    //         // printf("\n");
+    //
+    //     }
+    //     // printBits(sizeof(buffer[i]), &buffer[i]);
+    //
+    //     // terminou um X, adiciona no vetor
+    //     if (!((i+1)%8) && i != 0) {
+    //         // printf("passei %lx\n", X);
+    //         filebits[f] = X;
+    //         // printf("i: %d\n", i);
+    //         // printBits(sizeof(X), &X);
+    //         f++;
+    //         X = 0;
+    //     }
+    // }
 
     printf("File len: %ld\n", filelen);
     // decriptografa e escreve no arquivo de saída
     FILE *write;
-    write = fopen("dout.txt","wb");
+    write = fopen(file_out_name,"wb");
     uint64_t Xa, Xb;
     uint64_t *decript = NULL;
     printf("criptografado lido\n");
-    for (i = 0; i < f; i += 2) {
-        Xa = filebits[i];
-        Xb = filebits[i+1];
+    for (i = 0; i < filelen/8; i += 2) {
+        Xa = buffer[i];
+        Xb = buffer[i+1];
 
-        printf("%lx \t%lx\n", Xa, Xb);
+        // printf("%lx \t%lx\n", Xa, Xb);
         decript = K128_decript(subkeys, Xa, Xb);
         Xa = decript[0];
         Xb = decript[1];
         // fwrite(&Xa,sizeof(Xa), 1, write);
         // fwrite(&Xb,sizeof(Xb), 1, write);
 
-        // printf("%lx \t%lx\n", Xa, Xb);
+        printf("i: %d - %lx \t%lx\n",i, Xa, Xb);
 
         // converte os 8 bytes decriptografados pra 8 bytes separados e escreve
         uint8_t a[8], b[8];
@@ -386,11 +386,11 @@ void decrypt_file(char *filename, uint64_t *subkeys) {
         char c_a, c_b;
         for (int j = 0; j < 8; j++) {
             c_a = a[j];
-            fwrite(&c_a,sizeof(c_a), 1, write);
+            fwrite(&c_a, 1, 1, write);
         }
         for (int j = 0; j < 8; j++) {
             c_b = b[j];
-            fwrite(&c_b,sizeof(c_b), 1, write);
+            fwrite(&c_b, 1, 1, write);
         }
     }
 
@@ -425,8 +425,8 @@ int main(int argc, char **argv) {
     K = gen_K(A);
     subkeys = gen_subkeys(R, K);
     ////////////////////////////// file stuff //////////////////////////////////
-    encrypt_file("carradio.txt", subkeys);
-    decrypt_file("out.bin", subkeys);
+    encrypt_file("carradio.txt", "out.bin", subkeys);
+    decrypt_file("out.bin", "dout.txt", subkeys);
     ////////////////////////////////////////////////////////////////////////////
 
     printf("%d\n", validade_entry(A));
