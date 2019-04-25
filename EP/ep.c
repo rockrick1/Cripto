@@ -2,6 +2,7 @@
 #include "opes.h"
 
 const unsigned A_SIZE = 128;
+const unsigned MAX_FILE_NAME = 128;
 const unsigned K_SIZE = 16;
 const unsigned R = 12;
 
@@ -193,7 +194,7 @@ uint64_t *K128_decript(uint64_t *subkeys, uint64_t XeFinal, uint64_t XfFinal) {
 }
 
 
-void encrypt_file(char *file_in_name, char *file_out_name, uint64_t *subkeys) {
+void encrypt_file(char *file_in_name, char *file_out_name, uint64_t *subkeys, int delete) {
     FILE *file;
     uint8_t *buffer;
     uint64_t *filebits;
@@ -359,50 +360,108 @@ void decrypt_file(char *file_in_name, char *file_out_name, uint64_t *subkeys) {
 }
 
 int main(int argc, char **argv) {
-    char *A, *K;
-    uint64_t *subkeys;
+    // char *A, *K;
+    // uint64_t *subkeys;
+    //
+    // EXP = malloc(257*sizeof(uint8_t));
+    // LOG = malloc(257*sizeof(uint8_t));
+    // gen_exp_log();
+    // // printf("bolinha\n");
+    // // uint64_t ble = bolinha(0x9e3779b97f4a7151, 0x1324819741ff2312);
+    // // printf("fim do bolinha\n");
+    //
+    // A = malloc(A_SIZE*sizeof(char));
+    //
+    // strcpy(A, "a1b2c3d4e5f6g7h8");
+    // strcpy(A, "00000000000000aa");
+    // if (!validade_entry(A)) {
+    //     printf("Invalid entry!\n");
+    //     free(A);
+    //     return 0;
+    // }
+    // K = gen_K(A);
+    // subkeys = gen_subkeys(R, K);
+    // ////////////////////////////// file stuff //////////////////////////////////
+    // encrypt_file("carradio.txt", "out.bin", subkeys, 0);
+    // decrypt_file("out.bin", "dout.txt", subkeys);
+    //
+    // encrypt_file("refuse.png", "out.bin", subkeys, 0);
+    // decrypt_file("out.bin", "out.png", subkeys);
+
+    /////////////////////////// terminal stuff /////////////////////////////////
+    int mode = 0;
+    if (!(strcmp(argv[1], "-c")))
+        mode = 1;
+    else if (!(strcmp(argv[1], "-d")))
+        mode = 2;
+    else if (!(strcmp(argv[1], "-1")))
+        mode = 3;
+    else if (!(strcmp(argv[1], "-2")))
+        mode = 4;
 
     EXP = malloc(257*sizeof(uint8_t));
     LOG = malloc(257*sizeof(uint8_t));
     gen_exp_log();
-    // printf("bolinha\n");
-    // uint64_t ble = bolinha(0x9e3779b97f4a7151, 0x1324819741ff2312);
-    // printf("fim do bolinha\n");
+
+    char out_file[MAX_FILE_NAME];
+    char in_file[MAX_FILE_NAME];
+    char *A, *K = NULL;
+    uint64_t *subkeys = NULL;
 
     A = malloc(A_SIZE*sizeof(char));
 
+    strcpy(in_file, argv[3]);
+    // vai ter arquivo de saida e depois a senha
+    if (mode == 1 || mode == 2) {
+        strcpy(out_file, argv[5]);
+        strcpy(A, argv[7]);
 
-    strcpy(A, "a1b2c3d4e5f6g7h8");
-    strcpy(A, "00000000000000aa");
-    if (!validade_entry(A)) {
-        printf("Invalid entry!\n");
-        free(A);
-        return 0;
+        if (!validade_entry(A)) {
+            printf("Invalid password!\n");
+            free(A);
+            free(EXP);
+            free(LOG);
+            return 0;
+        }
+
+        K = gen_K(A);
+        subkeys = gen_subkeys(R, K);
+
+        if (mode == 1) {
+            short delete = 0;
+            if (argc == 9 && !(strcmp(argv[8], "-a")))
+                delete = 1;
+
+            encrypt_file(in_file, out_file, subkeys, delete);
+        }
+
+        else { // mode = 2
+            decrypt_file(in_file, out_file, subkeys);
+        }
+
+
     }
-    K = gen_K(A);
-    subkeys = gen_subkeys(R, K);
-    ////////////////////////////// file stuff //////////////////////////////////
-    encrypt_file("carradio.txt", "out.bin", subkeys);
-    decrypt_file("out.bin", "dout.txt", subkeys);
+    // vai ter só o arquivo de entrada e a senha
+    else {
+        strcpy(A, argv[5]);
 
-    encrypt_file("refuse.png", "out.bin", subkeys);
-    decrypt_file("out.bin", "out.png", subkeys);
-    ////////////////////////////////////////////////////////////////////////////
+        if (mode == 3) {
 
-    printf("%d\n", validade_entry(A));
+        }
 
-    // uint64_t *cript = K128_encript(subkeys, 0x9e3779b97f4a7151, 0x1324819741ff2312);
-    // printf("\n\n%lx\n%lx\n\n", cript[0], cript[1]);
-    // uint64_t *decript = K128_decript(subkeys, cript[0], cript[1]);
-    // printf("\n\n%lx\n%lx\n\n", decript[0], decript[1]);
+        else { // mode = 4
 
+        }
+    }
+
+
+    ////////////////////////////// frees ///////////////////////////////////////
     free(subkeys);
     free(EXP);
     free(LOG);
-    // free(cript);
-    // free(decript);
     free(A);
     free(K);
+    ////////////////////////////////////////////////////////////////////////////
 
     return 0;
 }
