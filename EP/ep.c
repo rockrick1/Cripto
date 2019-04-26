@@ -199,7 +199,7 @@ void encrypt_file(char *file_in_name, char *file_out_name, uint64_t *subkeys, in
     uint8_t *buffer;
     uint64_t *filebits;
     long filelen;
-    int i, f;
+    unsigned long i, f;
 
     file = fopen(file_in_name, "rb");
     fseek(file, 0, SEEK_END);
@@ -246,6 +246,9 @@ void encrypt_file(char *file_in_name, char *file_out_name, uint64_t *subkeys, in
             if (last <= 8) {
                 filebits[++f] = 0xffffffffffffffff;
             }
+            // escreve o tamanho real do arquivo original depois do padding
+            filebits[f+1] = filelen;
+            filebits[f+2] = 0;
             // termina de processar o arquivo
             continue;
         }
@@ -270,14 +273,14 @@ void encrypt_file(char *file_in_name, char *file_out_name, uint64_t *subkeys, in
     // a esse ponto, f é o tamanho do arquivo, contando o padding
     uint64_t Xa, Xb;
     uint64_t *cript = NULL;
-    for (i = 0; i < f; i += 2) {
+    for (i = 0; i < f + 2; i += 2) {
         Xa = filebits[i];
         Xb = filebits[i+1];
-        printf("i: %d - %lx \t%lx\n",i, Xa, Xb);
+        printf("i: %lu - %lx \t%lx\n",i, Xa, Xb);
     }
 
     printf("\ncriptografado\n");
-    for (i = 0; i < f; i += 2) {
+    for (i = 0; i < f + 2; i += 2) {
         Xa = filebits[i];
         Xb = filebits[i+1];
 
@@ -285,7 +288,7 @@ void encrypt_file(char *file_in_name, char *file_out_name, uint64_t *subkeys, in
         Xa = cript[0];
         Xb = cript[1];
 
-        printf("i: %d - %lx \t%lx\n",i, Xa, Xb);
+        printf("i: %lu - %lx \t%lx\n",i, Xa, Xb);
 
         fwrite(&Xa,sizeof(Xa), 1, write);
         fwrite(&Xb,sizeof(Xb), 1, write);
@@ -303,7 +306,7 @@ void decrypt_file(char *file_in_name, char *file_out_name, uint64_t *subkeys) {
     FILE *file;
     uint64_t *buffer;
     long filelen;
-    int i;
+    unsigned long i, actual_filelen;
 
     file = fopen(file_in_name, "rb");
     fseek(file, 0, SEEK_END);
@@ -323,7 +326,15 @@ void decrypt_file(char *file_in_name, char *file_out_name, uint64_t *subkeys) {
     uint64_t Xa, Xb;
     uint64_t *decript = NULL;
     printf("criptografado lido\n");
-    for (i = 0; i < filelen/8; i += 2) {
+
+    decript = K128_decript(subkeys, buffer[(filelen/8)-2], buffer[(filelen/8)-1]);
+    actual_filelen = decript[0];
+    printf("actual: %lu\n", decript[0]);
+
+    // sempre que escrevermos um byte, incrementaremos esse aux, para
+    // escrevermos 'actual_filelen' quantidade de bytes
+    unsigned long aux = 0;
+    for (i = 0; i < filelen/8 && aux < actual_filelen; i += 2) {
         Xa = buffer[i];
         Xb = buffer[i+1];
 
@@ -331,7 +342,7 @@ void decrypt_file(char *file_in_name, char *file_out_name, uint64_t *subkeys) {
         Xa = decript[0];
         Xb = decript[1];
 
-        printf("i: %d - %lx \t%lx\n",i, Xa, Xb);
+        printf("i: %lu - %lx \t%lx\n",i, Xa, Xb);
 
         // converte os 8 bytes decriptografados pra 8 bytes separados e escreve
         // cada um
@@ -343,15 +354,18 @@ void decrypt_file(char *file_in_name, char *file_out_name, uint64_t *subkeys) {
             Xb >>= 8;
         }
         char c_a, c_b;
-        for (int j = 0; j < 8; j++) {
+        for (int j = 0; j < 8 && aux < actual_filelen; j++) {
             c_a = a[j];
             fwrite(&c_a, 1, 1, write);
+            aux++;
         }
-        for (int j = 0; j < 8; j++) {
+        for (int j = 0; j < 8 && aux < actual_filelen; j++) {
             c_b = b[j];
             fwrite(&c_b, 1, 1, write);
+            aux++;
         }
     }
+    printf("%ld\n", aux);
 
     free(buffer);
     free(decript);
@@ -360,99 +374,104 @@ void decrypt_file(char *file_in_name, char *file_out_name, uint64_t *subkeys) {
 }
 
 int main(int argc, char **argv) {
-    // char *A, *K;
-    // uint64_t *subkeys;
-    //
-    // EXP = malloc(257*sizeof(uint8_t));
-    // LOG = malloc(257*sizeof(uint8_t));
-    // gen_exp_log();
-    // // printf("bolinha\n");
-    // // uint64_t ble = bolinha(0x9e3779b97f4a7151, 0x1324819741ff2312);
-    // // printf("fim do bolinha\n");
-    //
-    // A = malloc(A_SIZE*sizeof(char));
-    //
-    // strcpy(A, "a1b2c3d4e5f6g7h8");
-    // strcpy(A, "00000000000000aa");
-    // if (!validade_entry(A)) {
-    //     printf("Invalid entry!\n");
-    //     free(A);
-    //     return 0;
-    // }
-    // K = gen_K(A);
-    // subkeys = gen_subkeys(R, K);
-    // ////////////////////////////// file stuff //////////////////////////////////
-    // encrypt_file("carradio.txt", "out.bin", subkeys, 0);
-    // decrypt_file("out.bin", "dout.txt", subkeys);
-    //
-    // encrypt_file("refuse.png", "out.bin", subkeys, 0);
-    // decrypt_file("out.bin", "out.png", subkeys);
-
-    /////////////////////////// terminal stuff /////////////////////////////////
-    int mode = 0;
-    if (!(strcmp(argv[1], "-c")))
-        mode = 1;
-    else if (!(strcmp(argv[1], "-d")))
-        mode = 2;
-    else if (!(strcmp(argv[1], "-1")))
-        mode = 3;
-    else if (!(strcmp(argv[1], "-2")))
-        mode = 4;
+    char *A, *K;
+    uint64_t *subkeys;
 
     EXP = malloc(257*sizeof(uint8_t));
     LOG = malloc(257*sizeof(uint8_t));
     gen_exp_log();
-
-    char out_file[MAX_FILE_NAME];
-    char in_file[MAX_FILE_NAME];
-    char *A, *K = NULL;
-    uint64_t *subkeys = NULL;
+    // printf("bolinha\n");
+    // uint64_t ble = bolinha(0x9e3779b97f4a7151, 0x1324819741ff2312);
+    // printf("fim do bolinha\n");
 
     A = malloc(A_SIZE*sizeof(char));
 
-    strcpy(in_file, argv[3]);
-    // vai ter arquivo de saida e depois a senha
-    if (mode == 1 || mode == 2) {
-        strcpy(out_file, argv[5]);
-        strcpy(A, argv[7]);
-
-        if (!validade_entry(A)) {
-            printf("Invalid password!\n");
-            free(A);
-            free(EXP);
-            free(LOG);
-            return 0;
-        }
-
-        K = gen_K(A);
-        subkeys = gen_subkeys(R, K);
-
-        if (mode == 1) {
-            short delete = 0;
-            if (argc == 9 && !(strcmp(argv[8], "-a")))
-                delete = 1;
-
-            encrypt_file(in_file, out_file, subkeys, delete);
-        }
-
-        else { // mode = 2
-            decrypt_file(in_file, out_file, subkeys);
-        }
-
-
+    strcpy(A, "a1b2c3d4e5f6g7h8");
+    // strcpy(A, "00000000000000aa");
+    if (!validade_entry(A)) {
+        printf("Invalid entry!\n");
+        free(A);
+        return 0;
     }
-    // vai ter só o arquivo de entrada e a senha
-    else {
-        strcpy(A, argv[5]);
+    K = gen_K(A);
+    subkeys = gen_subkeys(R, K);
+    ////////////////////////////// file stuff //////////////////////////////////
+    encrypt_file("carradio.txt", "out.bin", subkeys, 0);
+    decrypt_file("out.bin", "dout.txt", subkeys);
 
-        if (mode == 3) {
+    // encrypt_file("just do it.mp3", "out.bin", subkeys, 0);
+    // decrypt_file("out.bin", "out.mp3", subkeys);
 
-        }
-
-        else { // mode = 4
-
-        }
-    }
+    /////////////////////////// terminal stuff /////////////////////////////////
+    // short mode = 0;
+    // if (!(strcmp(argv[1], "-c")))
+    //     mode = 1;
+    // else if (!(strcmp(argv[1], "-d")))
+    //     mode = 2;
+    // else if (!(strcmp(argv[1], "-1")))
+    //     mode = 3;
+    // else if (!(strcmp(argv[1], "-2")))
+    //     mode = 4;
+    //
+    // EXP = malloc(257*sizeof(uint8_t));
+    // LOG = malloc(257*sizeof(uint8_t));
+    // gen_exp_log();
+    //
+    // char out_file[MAX_FILE_NAME];
+    // char in_file[MAX_FILE_NAME];
+    // char *A, *K = NULL;
+    // A = malloc(A_SIZE*sizeof(char));
+    // uint64_t *subkeys = NULL;
+    //
+    // for (int i = 1; i < argc; i++) {
+    //     if (!(strcmp(argv[i], "-i")))
+    //         strcpy(in_file, argv[++i]);
+    //
+    //     if (!(strcmp(argv[i], "-o")))
+    //         strcpy(out_file, argv[++i]);
+    //
+    //     if (!(strcmp(argv[i], "-p")))
+    //         strcpy(A, argv[++i]);
+    // }
+    //
+    //
+    // // vai ter arquivo de saida e depois a senha
+    // if (mode == 1 || mode == 2) {
+    //     if (!validade_entry(A)) {
+    //         printf("Invalid password!\n");
+    //         free(A);
+    //         free(EXP);
+    //         free(LOG);
+    //         return 0;
+    //     }
+    //
+    //     K = gen_K(A);
+    //     subkeys = gen_subkeys(R, K);
+    //
+    //     if (mode == 1) {
+    //         short delete = 0;
+    //         if (argc == 9 && !(strcmp(argv[8], "-a")))
+    //             delete = 1;
+    //
+    //         encrypt_file(in_file, out_file, subkeys, delete);
+    //     }
+    //
+    //     else { // mode = 2
+    //         decrypt_file(in_file, out_file, subkeys);
+    //     }
+    //
+    //
+    // }
+    // // vai ter só o arquivo de entrada e a senha
+    // else {
+    //     if (mode == 3) {
+    //
+    //     }
+    //
+    //     else { // mode = 4
+    //
+    //     }
+    // }
 
 
     ////////////////////////////// frees ///////////////////////////////////////
