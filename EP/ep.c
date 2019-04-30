@@ -194,7 +194,7 @@ uint64_t *K128_decript(uint64_t *subkeys, uint64_t XeFinal, uint64_t XfFinal) {
 }
 
 
-void encrypt_file(char *file_in_name, char *file_out_name, uint64_t *subkeys) {
+void encrypt_file(char *file_in_name, char *file_out_name, uint64_t *subkeys, int CBC) {
     FILE *file;
     uint8_t *buffer;
     uint64_t *filebits;
@@ -285,6 +285,11 @@ void encrypt_file(char *file_in_name, char *file_out_name, uint64_t *subkeys) {
         Xa = filebits[i];
         Xb = filebits[i+1];
 
+        if (CBC && i != 0) {
+            Xa ^= cript[0];
+            Xb ^= cript[1];
+        }
+
         cript = K128_encript(subkeys, Xa, Xb);
         Xa = cript[0];
         Xb = cript[1];
@@ -303,7 +308,7 @@ void encrypt_file(char *file_in_name, char *file_out_name, uint64_t *subkeys) {
 }
 
 
-void decrypt_file(char *file_in_name, char *file_out_name, uint64_t *subkeys) {
+void decrypt_file(char *file_in_name, char *file_out_name, uint64_t *subkeys, int CBC) {
     FILE *file;
     uint64_t *buffer;
     long filelen;
@@ -329,6 +334,9 @@ void decrypt_file(char *file_in_name, char *file_out_name, uint64_t *subkeys) {
     printf("criptografado lido\n");
 
     decript = K128_decript(subkeys, buffer[(filelen/8)-2], buffer[(filelen/8)-1]);
+    if (CBC) {
+        decript[0] ^= buffer[(filelen/8)-4];
+    }
     actual_filelen = decript[0];
     printf("actual: %lu\n", decript[0]);
 
@@ -342,6 +350,11 @@ void decrypt_file(char *file_in_name, char *file_out_name, uint64_t *subkeys) {
         decript = K128_decript(subkeys, Xa, Xb);
         Xa = decript[0];
         Xb = decript[1];
+
+        if (CBC && i != 0) {
+            Xa ^= buffer[i-2];
+            Xb ^= buffer[i-1];
+        }
 
         printf("i: %lu - %lx \t%lx\n",i, Xa, Xb);
 
@@ -416,9 +429,9 @@ int main(int argc, char **argv) {
     K = gen_K(A);
     subkeys = gen_subkeys(R, K);
     ////////////////////////////// file stuff //////////////////////////////////
-    encrypt_file("carradio.txt", "out.bin", subkeys);
+    encrypt_file("carradio.txt", "out.bin", subkeys, 1);
     // delete_file("carradio.txt");
-    decrypt_file("out.bin", "dout.txt", subkeys);
+    decrypt_file("out.bin", "dout.txt", subkeys, 1);
 
     // encrypt_file("just do it.mp3", "out.bin", subkeys, 0);
     // decrypt_file("out.bin", "out.mp3", subkeys);
