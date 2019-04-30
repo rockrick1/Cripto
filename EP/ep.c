@@ -194,7 +194,7 @@ uint64_t *K128_decript(uint64_t *subkeys, uint64_t XeFinal, uint64_t XfFinal) {
 }
 
 
-void encrypt_file(char *file_in_name, char *file_out_name, uint64_t *subkeys, int delete) {
+void encrypt_file(char *file_in_name, char *file_out_name, uint64_t *subkeys) {
     FILE *file;
     uint8_t *buffer;
     uint64_t *filebits;
@@ -215,6 +215,7 @@ void encrypt_file(char *file_in_name, char *file_out_name, uint64_t *subkeys, in
 
     // monta o vetor filebits de blocos de 8 bytes do arquivo lido
     uint64_t X = 0;
+    printf("%ld\n",filelen );
     for(i = 0, f = 0; i < filelen; i++) {
         // monta um X
         X <<= 8;
@@ -373,6 +374,25 @@ void decrypt_file(char *file_in_name, char *file_out_name, uint64_t *subkeys) {
     fclose(write);
 }
 
+void delete_file(char *filename) {
+    printf("vo deleta hein\n");
+
+    FILE *file;
+    long filelen;
+
+    file = fopen(filename, "w+");
+    fseek(file, 0, SEEK_END);
+    filelen = ftell(file);
+    rewind(file);
+
+    char buf[2];
+    sprintf(buf, " ");
+    for (int i = 0; i < filelen; i++)
+        fwrite(buf, strlen(buf), 1, file);
+    fclose(file);
+    remove(filename);
+}
+
 int main(int argc, char **argv) {
     char *A, *K;
     uint64_t *subkeys;
@@ -396,14 +416,15 @@ int main(int argc, char **argv) {
     K = gen_K(A);
     subkeys = gen_subkeys(R, K);
     ////////////////////////////// file stuff //////////////////////////////////
-    encrypt_file("carradio.txt", "out.bin", subkeys, 0);
+    encrypt_file("carradio.txt", "out.bin", subkeys);
+    // delete_file("carradio.txt");
     decrypt_file("out.bin", "dout.txt", subkeys);
 
     // encrypt_file("just do it.mp3", "out.bin", subkeys, 0);
     // decrypt_file("out.bin", "out.mp3", subkeys);
 
     /////////////////////////// terminal stuff /////////////////////////////////
-    // short mode = 0;
+    // short mode = 0, delete = 0;
     // if (!(strcmp(argv[1], "-c")))
     //     mode = 1;
     // else if (!(strcmp(argv[1], "-d")))
@@ -427,11 +448,14 @@ int main(int argc, char **argv) {
     //     if (!(strcmp(argv[i], "-i")))
     //         strcpy(in_file, argv[++i]);
     //
-    //     if (!(strcmp(argv[i], "-o")))
+    //     else if (!(strcmp(argv[i], "-o")))
     //         strcpy(out_file, argv[++i]);
     //
-    //     if (!(strcmp(argv[i], "-p")))
+    //     else if (!(strcmp(argv[i], "-p")))
     //         strcpy(A, argv[++i]);
+    //
+    //     else if (!(strcmp(argv[i], "-a")))
+    //         delete = 1;
     // }
     //
     //
@@ -449,11 +473,8 @@ int main(int argc, char **argv) {
     //     subkeys = gen_subkeys(R, K);
     //
     //     if (mode == 1) {
-    //         short delete = 0;
-    //         if (argc == 9 && !(strcmp(argv[8], "-a")))
-    //             delete = 1;
-    //
     //         encrypt_file(in_file, out_file, subkeys, delete);
+    //         if (delete) delete_file(in_file);
     //     }
     //
     //     else { // mode = 2
