@@ -289,6 +289,12 @@ void encrypt_file(char *file_in_name, char *file_out_name, uint64_t *subkeys, in
             Xa ^= cript[0];
             Xb ^= cript[1];
         }
+        else if (CBC) {
+            uint64_t initial_value = 0;
+            initial_value = ~initial_value;
+            Xa ^= initial_value;
+            Xb ^= initial_value;
+        }
 
         cript = K128_encript(subkeys, Xa, Xb);
         Xa = cript[0];
@@ -354,6 +360,12 @@ void decrypt_file(char *file_in_name, char *file_out_name, uint64_t *subkeys, in
         if (CBC && i != 0) {
             Xa ^= buffer[i-2];
             Xb ^= buffer[i-1];
+        }
+        else if (CBC) {
+            uint64_t initial_value = 0;
+            initial_value = ~initial_value;
+            Xa ^= initial_value;
+            Xb ^= initial_value;
         }
 
         printf("i: %lu - %lx \t%lx\n",i, Xa, Xb);
