@@ -35,6 +35,7 @@ char *gen_K(char *A) {
     return K;
 }
 
+
 uint64_t *gen_subkeys(int R, char *K) {
     uint64_t *L = malloc((4*R + 3)*sizeof(uint64_t));
     uint64_t *subkeys = malloc((4*R + 4)*sizeof(uint64_t));
@@ -374,6 +375,7 @@ void decrypt_file(char *file_in_name, char *file_out_name, uint64_t *subkeys) {
     fclose(write);
 }
 
+
 void delete_file(char *filename) {
     printf("vo deleta hein\n");
 
@@ -392,6 +394,132 @@ void delete_file(char *filename) {
     fclose(file);
     remove(filename);
 }
+
+
+int hamming(uint64_t A, uint64_t B) {
+    int h = 0;
+    uint64_t C = A ^ B;
+    while (C) {
+        h += C & 1;
+        C >>= 1;
+    }
+    return h;
+}
+
+
+void entropy(char *file_in_name, uint64_t *subkeys) {
+    FILE *file;
+    uint8_t *buffer;
+    uint64_t *fbits;
+    uint64_t *fbitsC;
+    uint64_t *fbitsAlter;
+    uint64_t *fbitsAlterC;
+    long filelen;
+    unsigned long i, j, f;
+
+    file = fopen(file_in_name, "rb");
+    fseek(file, 0, SEEK_END);
+    filelen = ftell(file);
+    rewind(file);
+    buffer = malloc((filelen+1)*sizeof(uint8_t));
+
+    fbits = malloc((filelen+1)*sizeof(uint64_t));
+    fbitsC = malloc((filelen+1)*sizeof(uint64_t));
+    fbitsAlter = malloc((filelen+1)*sizeof(uint64_t));
+    fbitsAlterC = malloc((filelen+1)*sizeof(uint64_t));
+
+    printf("%ld\n", filelen*8);
+
+    // le o arquivo de byte em byte, e guarda num buffer
+    for(i = 0; i < filelen; i++) {
+        if (fread(buffer + i, 1, 1, file));
+    }
+
+    // monta o vetor fbits de blocos de 8 bytes do arquivo lido
+    uint64_t X = 0;
+    for(i = 0, f = 0; i < filelen; i++) {
+        // monta um X
+        X <<= 8;
+        X |= buffer[i];
+
+        // // se esse for o ultimo byte, faz o padding
+        // if (i + 1 == filelen) {
+        //     // tamanho do ultimo bloco, em bytes
+        //     int last = (i+1)%8;
+        //     // se o ultimo bloco nao for de 64 bits, faz o padding com uns
+        //     if (last != 0) {
+        //         int remaining = 8 - last; // quantos bytes faltam no final
+        //         uint8_t uns = 0xff; // 1111 1111
+        //         // nesse ponto, X tem o fim do arquivo, entao deslocamos
+        //         // e adicionamos uns
+        //         for (int k = 0; k < remaining; k++) {
+        //             X <<= 8;
+        //             X |= uns;
+        //         }
+        //         fbits[f] = X;
+        //         printBits(sizeof(X), &X);
+        //         printf("last %d, remain %d\n", last, remaining);
+        //         X = 0;
+        //     }
+        //     // agora checamos se o ultimo bloco tem 128 bits
+        //     // se ele tinha menos ou exatamente 64 bits, o padding feito
+        //     // acima nao foi o suficiente, logo adicionamos mais 8 bytes de uns
+        //     last = (i+1)%16;
+        //     if (last <= 8) {
+        //         fbits[++f] = 0xffffffffffffffff;
+        //     }
+        //     // escreve o tamanho real do arquivo original depois do padding
+        //     fbits[f+1] = filelen;
+        //     fbits[f+2] = 0;
+        //     // termina de processar o arquivo
+        //     continue;
+        // }
+
+        // terminou um X, adiciona no vetor
+        if (!((i+1)%8) && i != 0) {
+            fbits[f] = X;
+            f++;
+            X = 0;
+        }
+    }
+
+    // escreve o arquivo criptografado em fbits
+    uint64_t Xa, Xb;
+    uint64_t *cript = NULL;
+    for (i = 0; i < f + 2; i += 2) {
+        Xa = filebits[i];
+        Xb = filebits[i+1];
+        printf("i: %lu - %lx \t%lx\n",i, Xa, Xb);
+    }
+
+    printf("\ncriptografado\n");
+    for (i = 0; i < f + 2; i += 2) {
+        Xa = filebits[i];
+        Xb = filebits[i+1];
+
+        cript = K128_encript(subkeys, Xa, Xb);
+        Xa = cript[0];
+        Xb = cript[1];
+
+        printf("i: %lu - %lx \t%lx\n",i, Xa, Xb);
+
+        fwrite(&Xa,sizeof(Xa), 1, write);
+        fwrite(&Xb,sizeof(Xb), 1, write);
+    }
+
+    // filelen*8 = numero de bits no arquivo
+    for (j = 0; j < filelen*8; j++) {
+        // altera o j-esimo bit do arquivo, e criptografa
+    }
+
+    fclose(file);
+    free(buffer);
+    free(fbits);
+    free(fbitsC);
+    free(fbitsAlter);
+    free(fbitsAlterC);
+}
+
 
 int main(int argc, char **argv) {
     char *A, *K;
@@ -415,10 +543,12 @@ int main(int argc, char **argv) {
     }
     K = gen_K(A);
     subkeys = gen_subkeys(R, K);
+
     ////////////////////////////// file stuff //////////////////////////////////
-    encrypt_file("carradio.txt", "out.bin", subkeys);
+    entropy("512.txt", subkeys);
+    // encrypt_file("ep.c", "out.bin", subkeys);
     // delete_file("carradio.txt");
-    decrypt_file("out.bin", "dout.txt", subkeys);
+    // decrypt_file("out.bin", "pe2.c", subkeys);
 
     // encrypt_file("just do it.mp3", "out.bin", subkeys, 0);
     // decrypt_file("out.bin", "out.mp3", subkeys);
