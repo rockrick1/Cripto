@@ -225,45 +225,53 @@ void encrypt_file(char *file_in_name, char *file_out_name, uint64_t *subkeys, in
         // se esse for o ultimo byte, faz o padding
         if (i + 1 == filelen) {
             // tamanho do ultimo bloco, em bytes
-            int last = (i+1)%8;
+            int last = (i+1)%16;
+            printf("last %d\n", last);
             // se o ultimo bloco nao for de 64 bits, faz o padding com uns
             if (last != 0) {
-                int remaining = 8 - last; // quantos bytes faltam no final
-                uint8_t uns = 0xff; // 1111 1111
-                // nesse ponto, X tem o fim do arquivo, entao deslocamos
-                // e adicionamos uns
-                for (int k = 0; k < remaining; k++) {
-                    X <<= 8;
-                    X |= uns;
+                if (last != 8) {
+                    int aux = (i+1)%8;
+                    int remaining = 8 - aux; // quantos bytes faltam no final
+                    uint8_t uns = 0xff; // 1111 1111
+                    // nesse ponto, X tem o fim do arquivo, entao deslocamos
+                    // e adicionamos uns
+                    for (int k = 0; k < remaining; k++) {
+                        X <<= 8;
+                        X |= uns;
+                    }
+                    filebits[f++] = X;
+                    // filebits[++f] = 0xffffffffffffffff;
+                    printBits(sizeof(X), &X);
+                    printf("last %d, remain %d\n", last, remaining);
+                    X = 0;
                 }
-                filebits[f] = X;
-                printBits(sizeof(X), &X);
-                printf("last %d, remain %d\n", last, remaining);
-                X = 0;
+                // agora checamos se o ultimo bloco tem 128 bits
+                // se ele tinha menos ou exatamente 64 bits, o padding feito
+                // acima nao foi o suficiente, logo adicionamos mais 8 bytes de uns
+                if (last == 8) filebits[f++] = X;
+                if (last <= 8) filebits[f++] = 0xffffffffffffffff;
+
             }
-            // agora checamos se o ultimo bloco tem 128 bits
-            // se ele tinha menos ou exatamente 64 bits, o padding feito
-            // acima nao foi o suficiente, logo adicionamos mais 8 bytes de uns
-            last = (i+1)%16;
-            printf("last %d\n", last);
-            if (last <= 8 && last != 0) {
-                printf("settei tudo um muhahaha\n");
-                filebits[++f] = 0xffffffffffffffff;
+            else {
+                filebits[f++] = X;
             }
-            else if (last == 0) {
-                filebits[f] = X;
-            }
+            // if (last < 8) {
+            //     printf("settei tudo um muhahaha\n");
+            //     filebits[f++] = 0xffffffffffffffff;
+            // }
+            // else if (last == 0) {
+            //     filebits[f] = X;
+            // }
             // escreve o tamanho real do arquivo original depois do padding
-            filebits[f+1] = filelen;
-            filebits[f+2] = 0;
+            filebits[f++] = filelen;
+            filebits[f] = 0;
             // termina de processar o arquivo
             continue;
         }
 
         // terminou um X, adiciona no vetor
         if (!((i+1)%8) && i != 0) {
-            filebits[f] = X;
-            f++;
+            filebits[f++] = X;
             X = 0;
         }
     }
@@ -280,14 +288,14 @@ void encrypt_file(char *file_in_name, char *file_out_name, uint64_t *subkeys, in
     // a esse ponto, f é o tamanho do arquivo, contando o padding
     uint64_t Xa, Xb;
     uint64_t *cript = NULL;
-    for (i = 0; i < f + 2; i += 2) {
+    for (i = 0; i < f; i += 2) {
         Xa = filebits[i];
         Xb = filebits[i+1];
         printf("i: %lu - %lx \t%lx\n",i, Xa, Xb);
     }
 
     printf("\ncriptografado\n");
-    for (i = 0; i < f + 2; i += 2) {
+    for (i = 0; i < f; i += 2) {
         Xa = filebits[i];
         Xb = filebits[i+1];
 
