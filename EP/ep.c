@@ -9,18 +9,6 @@ const unsigned R = 12;
 uint8_t *EXP;
 uint8_t *LOG;
 
-void print_char(char a) {
-    int i;
-    for (i = 0; i < 8; i++) {
-        printf("%d", !!((a << i) & 0x80));
-    }
-}
-
-void print_string(char *s) {
-    for (int i = 0; i < strlen(s); i++)
-        print_char(s[i]);
-    printf("\n");
-}
 
 char *gen_K(char *A) {
     char *K = malloc(16*sizeof(char) + 1);
@@ -29,9 +17,6 @@ char *gen_K(char *A) {
         K[i] = A[i%strlen(A)];
     }
     K[K_SIZE] = '\0';
-
-    printf("K: %s\n", K);
-    printf("k size: %lu\n", sizeof(K));
     return K;
 }
 
@@ -45,29 +30,11 @@ uint64_t *gen_subkeys(int R, char *K) {
         L[1] = L[1]<<8;
         L[0] |= K[i];
         L[1] |= K[i+8];
-        // print_char(K[i]);
-        // printf("\n");
-        // printBits(sizeof(L[0]), &L[0]);
-        // printBits(sizeof(L[1]), &L[1]);
     }
-    // printf("\n");
-
 
     uint64_t num1 = 0x9e3779b97f4a7151;
     for (int j = 2; j <= 4*R + 2; j++) {
-
         L[j] = (L[j-1] + num1); //mod 2**64;
-        // printf("\t\t");
-        // printBits(sizeof(num1), &num1);
-        //
-        // printf("anterior:\t");
-        // printBits(sizeof(L[j-1]), &L[j-1]);
-        //
-        // printf("atual (%d):\t\t", j);
-        // printBits(sizeof(L[j]), &L[j]);
-        //
-        // printf("oie\n");
-        // printf("\n");
     }
 
     subkeys[0] = 0x8aed2a6bb7e15162;
@@ -82,24 +49,15 @@ uint64_t *gen_subkeys(int R, char *K) {
     for (int s = 1; s <= 4*R + 3; s++) {
         // (a)
         subkeys[i] += A + B;
-        // printf("antes: \n");
-        // printBits(sizeof(subkeys[i]), &subkeys[i]);
         subkeys[i] = rotate_bit(subkeys[i], 3);
-        // printf("depois: \n   ");
-        // printBits(sizeof(subkeys[i]), &subkeys[i]);
         A = subkeys[i];
         i++;
 
         // (b)
         L[j] += A + B;
-        // printf("antes: \n");
-        // printBits(sizeof(L[j]), &L[j]);
         L[j] = rotate_bit(L[j], (A+B)%64);
-        // printf("depois: \n");
-        // printBits(sizeof(L[j]), &L[j]);
         B = L[j];
         j++;
-        // printf("\n\n");
     }
 
     return subkeys;
@@ -216,7 +174,6 @@ void encrypt_file(char *file_in_name, char *file_out_name, uint64_t *subkeys, in
 
     // monta o vetor filebits de blocos de 8 bytes do arquivo lido
     uint64_t X = 0;
-    printf("filelen %ld\n",filelen );
     for(i = 0, f = 0; i < filelen + 1; i++) {
         // monta um X
         X <<= 8;
@@ -226,7 +183,6 @@ void encrypt_file(char *file_in_name, char *file_out_name, uint64_t *subkeys, in
         if (i + 1 == filelen) {
             // tamanho do ultimo bloco, em bytes
             int last = (i+1)%16;
-            printf("last %d\n", last);
             // se o ultimo bloco nao for de 64 bits, faz o padding com uns
             if (last != 0) {
                 if (last != 8) {
@@ -240,14 +196,12 @@ void encrypt_file(char *file_in_name, char *file_out_name, uint64_t *subkeys, in
                         X |= uns;
                     }
                     filebits[f++] = X;
-                    // filebits[++f] = 0xffffffffffffffff;
-                    printBits(sizeof(X), &X);
-                    printf("last %d, remain %d\n", last, remaining);
                     X = 0;
                 }
                 // agora checamos se o ultimo bloco tem 128 bits
                 // se ele tinha menos ou exatamente 64 bits, o padding feito
-                // acima nao foi o suficiente, logo adicionamos mais 8 bytes de uns
+                // acima nao foi o suficiente, logo adicionamos mais 8 bytes
+                // de uns
                 if (last == 8) filebits[f++] = X;
                 if (last <= 8) filebits[f++] = 0xffffffffffffffff;
 
@@ -255,13 +209,6 @@ void encrypt_file(char *file_in_name, char *file_out_name, uint64_t *subkeys, in
             else {
                 filebits[f++] = X;
             }
-            // if (last < 8) {
-            //     printf("settei tudo um muhahaha\n");
-            //     filebits[f++] = 0xffffffffffffffff;
-            // }
-            // else if (last == 0) {
-            //     filebits[f] = X;
-            // }
             // escreve o tamanho real do arquivo original depois do padding
             filebits[f++] = filelen;
             filebits[f] = 0;
@@ -276,25 +223,13 @@ void encrypt_file(char *file_in_name, char *file_out_name, uint64_t *subkeys, in
         }
     }
 
-    printf("terimnei de ler, vo criptografar\n");
-
-
-
     // criptografa e escreve no arquivo de saída
     FILE *write;
     write = fopen(file_out_name,"wb");
-    printf("\nantes de criptografar\n");
 
     // a esse ponto, f é o tamanho do arquivo, contando o padding
     uint64_t Xa, Xb;
     uint64_t *cript = NULL;
-    for (i = 0; i < f; i += 2) {
-        Xa = filebits[i];
-        Xb = filebits[i+1];
-        printf("i: %lu - %lx \t%lx\n",i, Xa, Xb);
-    }
-
-    printf("\ncriptografado\n");
     for (i = 0; i < f; i += 2) {
         Xa = filebits[i];
         Xb = filebits[i+1];
@@ -313,8 +248,6 @@ void encrypt_file(char *file_in_name, char *file_out_name, uint64_t *subkeys, in
         cript = K128_encript(subkeys, Xa, Xb);
         Xa = cript[0];
         Xb = cript[1];
-
-        printf("i: %lu - %lx \t%lx\n",i, Xa, Xb);
 
         fwrite(&Xa,sizeof(Xa), 1, write);
         fwrite(&Xb,sizeof(Xb), 1, write);
@@ -345,20 +278,17 @@ void decrypt_file(char *file_in_name, char *file_out_name, uint64_t *subkeys, in
         if (fread(buffer + i, sizeof(uint64_t), 1, file));
     }
 
-    printf("File len: %ld\n", filelen);
     // decriptografa e escreve no arquivo de saída
     FILE *write;
     write = fopen(file_out_name,"wb");
     uint64_t Xa, Xb;
     uint64_t *decript = NULL;
-    printf("criptografado lido\n");
 
     decript = K128_decript(subkeys, buffer[(filelen/8)-2], buffer[(filelen/8)-1]);
     if (CBC) {
         decript[0] ^= buffer[(filelen/8)-4];
     }
     actual_filelen = decript[0];
-    printf("actual: %lu\n", decript[0]);
 
     // sempre que escrevermos um byte, incrementaremos esse aux, para
     // escrevermos 'actual_filelen' quantidade de bytes
@@ -382,8 +312,6 @@ void decrypt_file(char *file_in_name, char *file_out_name, uint64_t *subkeys, in
             Xb ^= initial_value;
         }
 
-        printf("i: %lu - %lx \t%lx\n",i, Xa, Xb);
-
         // converte os 8 bytes decriptografados pra 8 bytes separados e escreve
         // cada um
         uint8_t a[8], b[8];
@@ -405,7 +333,6 @@ void decrypt_file(char *file_in_name, char *file_out_name, uint64_t *subkeys, in
             aux++;
         }
     }
-    printf("%ld\n", aux);
 
     free(buffer);
     free(decript);
@@ -415,8 +342,6 @@ void decrypt_file(char *file_in_name, char *file_out_name, uint64_t *subkeys, in
 
 
 void delete_file(char *filename) {
-    printf("vo deleta hein\n");
-
     FILE *file;
     long filelen;
 
@@ -467,8 +392,6 @@ void entropy(char *file_in_name, uint64_t *subkeys, int mode) {
     fbitsAlter = malloc((filelen+1)*sizeof(uint64_t));
     fbitsAlterC = malloc((filelen+1)*sizeof(uint64_t));
 
-    printf("%ld\n", filelen*8);
-
     // le o arquivo de byte em byte, e guarda num buffer
     for(i = 0; i < filelen; i++) {
         if (fread(buffer + i, 1, 1, file));
@@ -480,39 +403,6 @@ void entropy(char *file_in_name, uint64_t *subkeys, int mode) {
         // monta um X
         X <<= 8;
         X |= buffer[i];
-
-        // // se esse for o ultimo byte, faz o padding
-        // if (i + 1 == filelen) {
-        //     // tamanho do ultimo bloco, em bytes
-        //     int last = (i+1)%8;
-        //     // se o ultimo bloco nao for de 64 bits, faz o padding com uns
-        //     if (last != 0) {
-        //         int remaining = 8 - last; // quantos bytes faltam no final
-        //         uint8_t uns = 0xff; // 1111 1111
-        //         // nesse ponto, X tem o fim do arquivo, entao deslocamos
-        //         // e adicionamos uns
-        //         for (int k = 0; k < remaining; k++) {
-        //             X <<= 8;
-        //             X |= uns;
-        //         }
-        //         fbits[f] = X;
-        //         printBits(sizeof(X), &X);
-        //         printf("last %d, remain %d\n", last, remaining);
-        //         X = 0;
-        //     }
-        //     // agora checamos se o ultimo bloco tem 128 bits
-        //     // se ele tinha menos ou exatamente 64 bits, o padding feito
-        //     // acima nao foi o suficiente, logo adicionamos mais 8 bytes de uns
-        //     last = (i+1)%16;
-        //     if (last <= 8) {
-        //         fbits[++f] = 0xffffffffffffffff;
-        //     }
-        //     // escreve o tamanho real do arquivo original depois do padding
-        //     fbits[f+1] = filelen;
-        //     fbits[f+2] = 0;
-        //     // termina de processar o arquivo
-        //     continue;
-        // }
 
         // terminou um X, adiciona no vetor
         if (!((i+1)%8) && i != 0) {
@@ -529,10 +419,8 @@ void entropy(char *file_in_name, uint64_t *subkeys, int mode) {
     for (i = 0; i < f; i += 2) {
         Xa = fbitsAlter[i];
         Xb = fbitsAlter[i+1];
-        printf("i: %lu - %lx \t%lx\n",i, Xa, Xb);
     }
 
-    printf("\ncriptografado\n");
     for (i = 0; i < f; i += 2) {
         Xa = fbits[i];
         Xb = fbits[i+1];
@@ -555,7 +443,6 @@ void entropy(char *file_in_name, uint64_t *subkeys, int mode) {
 
         fbitsC[i] = Xa;
         fbitsC[i+1] = Xb;
-        printf("i: %lu - %lx \t%lx\n",i, fbitsC[i], fbitsC[i+1]);
     }
 
     long num_blocks = filelen/16;
@@ -641,16 +528,12 @@ int main(int argc, char **argv) {
     EXP = malloc(257*sizeof(uint8_t));
     LOG = malloc(257*sizeof(uint8_t));
     gen_exp_log();
-    // printf("bolinha\n");
-    // uint64_t ble = bolinha(0x9e3779b97f4a7151, 0x1324819741ff2312);
-    // printf("fim do bolinha\n");
 
     A = malloc(A_SIZE*sizeof(char));
 
     strcpy(A, "a1b2c3d4e5f6g7h8");
-    // strcpy(A, "00000000000000aa");
     if (!validade_entry(A)) {
-        printf("Invalid entry!\n");
+        printf("Invalid password!\n");
         free(A);
         return 0;
     }
@@ -667,8 +550,11 @@ int main(int argc, char **argv) {
     // delete_file("carradio.txt");
     decrypt_file("out.bin", "carout.txt", subkeys, 1);
 
-    // encrypt_file("just do it.mp3", "out.bin", subkeys, 0);
-    // decrypt_file("out.bin", "out.mp3", subkeys);
+    encrypt_file("refuse.png", "out.bin", subkeys, 1);
+    decrypt_file("out.bin", "out.png", subkeys, 1);
+    //
+    // // encrypt_file("just do it.mp3", "out.bin", subkeys, 0);
+    // // decrypt_file("out.bin", "out.mp3", subkeys);
 
     /////////////////////////// terminal stuff /////////////////////////////////
     // short mode = 0, delete = 0;
