@@ -44,7 +44,6 @@ uint64_t rotate_bit(uint64_t a, uint64_t d) {
 uint64_t bolinha(uint64_t B, uint64_t C) {
     extern uint8_t *EXP;
     uint8_t b[8], c[8];
-    // printBits(sizeof(B), &B);
 
     for (int i = 7; i >= 0; i--) {
         b[i] = B%256;
@@ -93,6 +92,7 @@ void gen_exp_log() {
 
     for (int i = 0; i <= 256; i++) {
         long long unsigned tmp = 1;
+        // tiramos mod toda vez para nao explodir o valor
         for (int j = 0; j < i; j++)
             tmp = (tmp*45)%257;
         EXP[i] = (uint8_t) tmp;

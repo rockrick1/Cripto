@@ -10,9 +10,12 @@ uint8_t *EXP;
 uint8_t *LOG;
 
 
+// Gera um K, dada uma chave A
 char *gen_K(char *A) {
     char *K = malloc(16*sizeof(char) + 1);
 
+    // Se A for mais curta que K_SIZE, concatena A com ela mesma até
+    // ter esse tamanho
     for (int i = 0; i < K_SIZE; i++) {
         K[i] = A[i%strlen(A)];
     }
@@ -21,10 +24,12 @@ char *gen_K(char *A) {
 }
 
 
+// Gera o vetor de subchaves, conforme descrito no enunciado
 uint64_t *gen_subkeys(int R, char *K) {
     uint64_t *L = malloc((4*R + 3)*sizeof(uint64_t));
     uint64_t *subkeys = malloc((4*R + 4)*sizeof(uint64_t));
 
+    // converte K para L0 e L1
     for (int i = 0; i < K_SIZE/2; i++) {
         L[0] = L[0]<<8;
         L[1] = L[1]<<8;
@@ -32,9 +37,10 @@ uint64_t *gen_subkeys(int R, char *K) {
         L[1] |= K[i+8];
     }
 
+    // gera o resto do vetor L
     uint64_t num1 = 0x9e3779b97f4a7151;
     for (int j = 2; j <= 4*R + 2; j++) {
-        L[j] = (L[j-1] + num1); //mod 2**64;
+        L[j] = (L[j-1] + num1); // mod 2**64 aturomatico
     }
 
     subkeys[0] = 0x8aed2a6bb7e15162;
@@ -64,6 +70,7 @@ uint64_t *gen_subkeys(int R, char *K) {
 }
 
 
+// criptograma Xa e Xb usando as subchaves dadas, pelo método K128
 uint64_t *K128_encript(uint64_t *subkeys, uint64_t Xa, uint64_t Xb) {
     uint64_t *ret = malloc(2*sizeof(uint64_t));
 
@@ -109,7 +116,7 @@ uint64_t *K128_encript(uint64_t *subkeys, uint64_t Xa, uint64_t Xb) {
     return ret;
 }
 
-
+// decriptograma XeFinal e XfFinal usando as subchaves dadas, pelo método K128
 uint64_t *K128_decript(uint64_t *subkeys, uint64_t XeFinal, uint64_t XfFinal) {
     uint64_t *ret = malloc(2*sizeof(uint64_t));
 
@@ -153,11 +160,13 @@ uint64_t *K128_decript(uint64_t *subkeys, uint64_t XeFinal, uint64_t XfFinal) {
 }
 
 
+// Criptografa um arquivo inteiro, usando o K128_encript para cada bloco
+// de 128 bits do arquivo, e escreve num arquivo de saida com nome dado
 void encrypt_file(char *file_in_name, char *file_out_name, uint64_t *subkeys, int CBC) {
     FILE *file;
-    uint8_t *buffer;
-    uint64_t *filebits;
-    long filelen;
+    uint8_t *buffer; // buffer para ler o arquivo
+    uint64_t *filebits; // vetor para guardar os blocos de 64 bits
+    long filelen; // tamanho do arquivo, em bytes
     unsigned long i, f;
 
     file = fopen(file_in_name, "rb");
@@ -167,7 +176,7 @@ void encrypt_file(char *file_in_name, char *file_out_name, uint64_t *subkeys, in
     buffer = malloc((filelen+1)*sizeof(uint8_t));
     filebits = malloc((filelen+1)*sizeof(uint64_t));
 
-    // le o arquivo de byte em byte, e guarda num buffer
+    // le o arquivo de byte em byte, e guarda no buffer
     for(i = 0; i < filelen; i++) {
         if (fread(buffer + i, 1, 1, file));
     }
@@ -181,10 +190,12 @@ void encrypt_file(char *file_in_name, char *file_out_name, uint64_t *subkeys, in
 
         // se esse for o ultimo byte, faz o padding
         if (i + 1 == filelen) {
-            // tamanho do ultimo bloco, em bytes
+            // tamanho do ultimo bloco de 128, em bytes
             int last = (i+1)%16;
-            // se o ultimo bloco nao for de 64 bits, faz o padding com uns
+            // se o ultimo bloco nao for de 128 bits, faz o padding com uns
             if (last != 0) {
+                // se o bloco nao for de exatamente 64 bits, faz o padding
+                // parcial
                 if (last != 8) {
                     int aux = (i+1)%8;
                     int remaining = 8 - aux; // quantos bytes faltam no final
@@ -198,18 +209,18 @@ void encrypt_file(char *file_in_name, char *file_out_name, uint64_t *subkeys, in
                     filebits[f++] = X;
                     X = 0;
                 }
-                // agora checamos se o ultimo bloco tem 128 bits
-                // se ele tinha menos ou exatamente 64 bits, o padding feito
-                // acima nao foi o suficiente, logo adicionamos mais 8 bytes
-                // de uns
+                // se for de exatamente 64 bits, escreve o ultimo bloco
+                // e faz o padding com 64 bits 1
                 if (last == 8) filebits[f++] = X;
                 if (last <= 8) filebits[f++] = 0xffffffffffffffff;
 
             }
+            // se o bloco for de exatamente 128 bits, não faz padding
             else {
                 filebits[f++] = X;
             }
-            // escreve o tamanho real do arquivo original depois do padding
+            // escreve o tamanho real do arquivo original depois do padding,
+            // ou do final, caso nao tenha sido feito padding
             filebits[f++] = filelen;
             filebits[f] = 0;
             // termina de processar o arquivo
@@ -227,24 +238,28 @@ void encrypt_file(char *file_in_name, char *file_out_name, uint64_t *subkeys, in
     FILE *write;
     write = fopen(file_out_name,"wb");
 
-    // a esse ponto, f é o tamanho do arquivo, contando o padding
+    // a esse ponto, f é o tamanho do arquivo, contando o padding, em blocos
+    // de 64 bits
     uint64_t Xa, Xb;
     uint64_t *cript = NULL;
     for (i = 0; i < f; i += 2) {
         Xa = filebits[i];
         Xb = filebits[i+1];
 
+        // faz o CBC
         if (CBC && i != 0) {
             Xa ^= cript[0];
             Xb ^= cript[1];
         }
         else if (CBC) {
+            // VI é todo bits 1
             uint64_t initial_value = 0;
             initial_value = ~initial_value;
             Xa ^= initial_value;
             Xb ^= initial_value;
         }
 
+        // criptografa e escreve no arquivo de saida
         cript = K128_encript(subkeys, Xa, Xb);
         Xa = cript[0];
         Xb = cript[1];
@@ -261,6 +276,8 @@ void encrypt_file(char *file_in_name, char *file_out_name, uint64_t *subkeys, in
 }
 
 
+// Decriptografa um arquivo inteiro, usando o K128_decript para cada bloco
+// de 128 bits do arquivo, e escreve num arquivo de saida com nome dado
 void decrypt_file(char *file_in_name, char *file_out_name, uint64_t *subkeys, int CBC) {
     FILE *file;
     uint64_t *buffer;
@@ -273,7 +290,7 @@ void decrypt_file(char *file_in_name, char *file_out_name, uint64_t *subkeys, in
     rewind(file);
     buffer = malloc(((filelen/8)+1)*sizeof(uint64_t));
 
-    // le o arquivo de 8 bytes em 8 bytes, e guarda num buffer
+    // le o arquivo de 64 em 64 bits, e guarda num buffer
     for(i = 0; i < filelen/8; i++) {
         if (fread(buffer + i, sizeof(uint64_t), 1, file));
     }
@@ -284,6 +301,8 @@ void decrypt_file(char *file_in_name, char *file_out_name, uint64_t *subkeys, in
     uint64_t Xa, Xb;
     uint64_t *decript = NULL;
 
+    // descobre o tamanho exato do arquivo original, que escrevemos no final do
+    // arquivo criptografado
     decript = K128_decript(subkeys, buffer[(filelen/8)-2], buffer[(filelen/8)-1]);
     if (CBC) {
         decript[0] ^= buffer[(filelen/8)-4];
@@ -301,11 +320,13 @@ void decrypt_file(char *file_in_name, char *file_out_name, uint64_t *subkeys, in
         Xa = decript[0];
         Xb = decript[1];
 
+        // faz o CBC reverso
         if (CBC && i != 0) {
             Xa ^= buffer[i-2];
             Xb ^= buffer[i-1];
         }
         else if (CBC) {
+            // VI é todo bits 1
             uint64_t initial_value = 0;
             initial_value = ~initial_value;
             Xa ^= initial_value;
@@ -313,7 +334,7 @@ void decrypt_file(char *file_in_name, char *file_out_name, uint64_t *subkeys, in
         }
 
         // converte os 8 bytes decriptografados pra 8 bytes separados e escreve
-        // cada um
+        // cada um, como chars
         uint8_t a[8], b[8];
         for (int j = 7; j >= 0; j--) {
             a[j] = Xa%256;
@@ -321,6 +342,8 @@ void decrypt_file(char *file_in_name, char *file_out_name, uint64_t *subkeys, in
             Xa >>= 8;
             Xb >>= 8;
         }
+
+        // não deixamos exceder actual_filelen quantidade de bytes no arquivo
         char c_a, c_b;
         for (int j = 0; j < 8 && aux < actual_filelen; j++) {
             c_a = a[j];
@@ -341,6 +364,7 @@ void decrypt_file(char *file_in_name, char *file_out_name, uint64_t *subkeys, in
 }
 
 
+// escreve brancos sobre cada char do arquivo, e depois deleta
 void delete_file(char *filename) {
     FILE *file;
     long filelen;
@@ -355,10 +379,11 @@ void delete_file(char *filename) {
     for (int i = 0; i < filelen; i++)
         fwrite(buf, strlen(buf), 1, file);
     fclose(file);
-    remove(filename);
+    remove(filename); // long live the king
 }
 
 
+// calcula a distancia de hamming dos bits de A e B
 int hamming(uint64_t A, uint64_t B) {
     int h = 0;
     uint64_t C = A ^ B;
@@ -370,6 +395,7 @@ int hamming(uint64_t A, uint64_t B) {
 }
 
 
+// calcula a entropia pelo modo mode (podendo ser 1 ou 2)
 void entropy(char *file_in_name, uint64_t *subkeys, int mode) {
     FILE *file;
     uint8_t *buffer;
@@ -460,10 +486,12 @@ void entropy(char *file_in_name, uint64_t *subkeys, int mode) {
         int big_block = j/128; // indice do inicio do bloco de 128 bits
         int idx_in_block = j%64; //indice do bit dentro do bloco
         uint64_t alter;
+
         if (mode == 1)
             alter = 0x8000000000000000; // apenas bit mais significativo=1
         else if (mode == 2)
             alter = 0x8080000000000000; // bit j e j+8 = 1
+        // move o bit 1 para a posição da iteração atual
         for (int k = 0; k < idx_in_block; k++) {
             alter /= 2;
         }
@@ -494,6 +522,7 @@ void entropy(char *file_in_name, uint64_t *subkeys, int mode) {
             fbitsAlterC[i+1] = Xb;
         }
 
+        // calcula as distancias
         H += hamming(fbitsC[big_block*2], fbitsAlterC[big_block*2]);
         H += hamming(fbitsC[(big_block*2) + 1], fbitsAlterC[(big_block*2) + 1]);
 
@@ -502,10 +531,11 @@ void entropy(char *file_in_name, uint64_t *subkeys, int mode) {
         if (H < min[big_block]) min[big_block] = H;
         sum[big_block] += H;
 
-        // retorna ao original
+        // retorna ao original, e passa para a proxima iteração
         fbitsAlter[block] = fbits[block];
     }
 
+    // imprime tudo numa tabelinha
     printf("bloco\tmax\tmin\tmedia\n");
     for (int p = 0; p < num_blocks; p++) {
         printf("%d \t %lu \t %lu \t %.2f\n", (p+1)*128, max[p], min[p], sum[p]/128.0);
