@@ -1,0 +1,80 @@
+MAC0336/5723 - Criptografia e Segurança de Dados
+Primeiro Exercício Programa
+
+
+Nome: Henrique Cerquinho
+NUSP: 9793700
+
+
+Arquivos inclusos:
+    -ep.c
+        módulo principal do EP, com a função main e as funções de criptografia,
+        decriptografia, cálculo de entropia e geração de subchaves.
+
+    -opes.c
+        módulo auxiliar, com funções auxiliares para o EP. Temos a função
+        'bolinha' (3a operação basica da criptografia), 'bolinha_inverse',
+        gen_exp_log, que inicia os vetores das funções f e f^-1, entre outras
+        funções auxiliares.
+    -opes.h
+        header do módulo opes.c, com as descrições de cada função.
+    -Makefile
+        makefile para compilar o EP.
+    -Arquivos restantes
+        Arquivos de teste.
+
+
+Como usar:
+    -Compilar com 'make'
+    -4 modos de uso:
+        Modo (1) Para criptografar arquivos:
+        ./ep -c -i <arquivo de entrada> -o <arquivo de saÌda> -p <senha> -a
+        *-a é opcional para deletar o arquivo de entrada após a criptografia
+
+        Modo (2) Para decriptografar arquivos:
+        ./ep -d -i <arquivo de entrada> -o <arquivo de saÌda> -p <senha>
+
+        Modo (3) Para calcular aleatoriedade pelo método 1, descrito no enunciado
+        ./ep -1 -i <arquivo de entrada> -p <senha>
+
+        Modo (4) Para calcular aleatoriedade pelo método 2, descrito no enunciado
+        ./ep -2 -i <arquivo de entrada> -p <senha>
+
+
+Computadores testados:
+    resultados de lscpu na linha de comando:
+
+    -notebook
+
+    Architecture:        x86_64
+    CPU op-mode(s):      32-bit, 64-bit
+    Byte Order:          Little Endian
+    CPU(s):              4
+    On-line CPU(s) list: 0-3
+    Thread(s) per core:  2
+    Core(s) per socket:  2
+    Socket(s):           1
+    NUMA node(s):        1
+    Vendor ID:           GenuineIntel
+    CPU family:          6
+    Model:               69
+    Model name:          Intel(R) Core(TM) i3-4005U CPU @ 1.70GHz
+    Stepping:            1
+    CPU MHz:             798.151
+    CPU max MHz:         1600,0000
+    CPU min MHz:         800,0000
+    BogoMIPS:            3392.10
+    Virtualization:      VT-x
+    L1d cache:           32K
+    L1i cache:           32K
+    L2 cache:            256K
+    L3 cache:            3072K
+    NUMA node0 CPU(s):   0-3
+    Flags:               fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge
+    mca cmov pat pse36 clflush dts acpi mmx fxsr sse sse2 ss ht tm pbe syscall
+    nx pdpe1gb rdtscp lm constant_tsc arch_perfmon pebs bts rep_good nopl xtopology
+    nonstop_tsc cpuid aperfmperf pni pclmulqdq dtes64 monitor ds_cpl vmx est tm2
+    ssse3 sdbg fma cx16 xtpr pdcm pcid sse4_1 sse4_2 movbe popcnt tsc_deadline_timer
+    aes xsave avx f16c rdrand lahf_lm abm cpuid_fault epb invpcid_single pti ssbd
+    ibrs ibpb stibp tpr_shadow vnmi flexpriority ept vpid fsgsbase tsc_adjust bmi1
+    avx2 smep bmi2 erms invpcid xsaveopt dtherm arat pln pts flush_l1d
